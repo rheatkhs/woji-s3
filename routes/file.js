@@ -313,7 +313,7 @@ router.post("/presign/:bucketName/:fileName", auth, async (req, res) => {
 });
 
 /**
- * Access file with public token if bucket is public (GET /public/:bucketName/:fileName?token=xxx)
+ * Access file with public token if bucket is private (GET /public/:bucketName/:fileName?token=xxx)
  */
 router.get("/public/:bucketName/:fileName", async (req, res) => {
   const { bucketName, fileName } = req.params;
@@ -330,10 +330,10 @@ router.get("/public/:bucketName/:fileName", async (req, res) => {
 
     if (!file) return res.status(404).json({ error: "File not found" });
 
-    // ✅ Public access allowed if bucket is marked public
+    // Public access allowed if bucket is marked public
     const isPublic = bucket.public;
 
-    // 🔒 If not public, require valid token
+    // If not public, require valid token
     if (!isPublic) {
       if (!token) {
         return res
@@ -350,7 +350,7 @@ router.get("/public/:bucketName/:fileName", async (req, res) => {
       }
     }
 
-    // ✅ Auth client setup
+    // Auth client setup
     const authClient = await getGoogleAuth(file.user || req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 

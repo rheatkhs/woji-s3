@@ -7,7 +7,6 @@ const fs = require("fs");
 
 const auth = require("./middlewares/auth");
 const oauthRoutes = require("./routes/oauth");
-const bucketRoutes = require("./routes/bucket");
 const fileRoutes = require("./routes/file");
 
 dotenv.config();
@@ -21,7 +20,6 @@ mongoose
 
 app.use(express.json());
 app.use("/", oauthRoutes);
-app.use("/", bucketRoutes);
 app.use("/", fileRoutes);
 
 const PORT = process.env.PORT || 8000;
