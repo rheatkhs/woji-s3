@@ -247,4 +247,35 @@ router.get("/public/:bucketName/:fileName", async (req, res) => {
   }
 });
 
+router.delete("/presign/:bucketName/:fileName", auth, async (req, res) => {
+  const { bucketName, fileName } = req.params;
+
+  try {
+    const bucket = await Bucket.findOne({
+      name: bucketName,
+      user: req.user._id,
+    });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    const file = await File.findOne({
+      file_name: fileName,
+      user: req.user._id,
+      bucket: bucket._id,
+    });
+
+    if (!file || !file.public_token) {
+      return res.status(404).json({ error: "No active token for this file" });
+    }
+
+    file.public_token = null;
+    file.expires_at = null;
+    await file.save();
+
+    res.json({ message: "Public token revoked successfully" });
+  } catch (err) {
+    console.error("Revoke token error:", err);
+    res.status(500).json({ error: "Failed to revoke token" });
+  }
+});
+
 module.exports = router;
