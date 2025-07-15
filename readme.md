@@ -1,117 +1,117 @@
-# 🪣 Woji-S3 — Google Drive-Powered Object Storage (S3-Style)
+# 🪣 Woji-S3 — "Totally Not S3™" Powered by Google Drive
 
-[![Node.js](https://img.shields.io/badge/Node.js-18.x-green.svg)](https://nodejs.org)
-[![Express](https://img.shields.io/badge/Express.js-lightgrey.svg)](https://expressjs.com/)
-[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-green)](https://www.mongodb.com/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](#license)
+> Because why pay AWS when you can duct-tape Google Drive into an object store like a real dev™️
 
-Woji-S3 is an open-source object storage API built with **Node.js**, **Express**, and **Google Drive**. It mirrors the behavior of AWS S3 — allowing you to create custom buckets, upload encrypted files, stream them, and generate pre-signed public URLs.
+[![Built with Duct Tape](https://img.shields.io/badge/built%20with-duct%20tape-blue.svg)](#)
+[![Runs on Coffee](https://img.shields.io/badge/fueled%20by-coffee-ff69b4.svg)](#)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow.svg)](#license)
 
----
-
-## ✨ Features
-
-- ✅ OAuth 2.0 login with Google
-- 📂 S3-style buckets using Google Drive folders
-- 🔒 Authenticated file uploads with encrypted names
-- 📥 File streaming & downloading
-- 🔗 Pre-signed URLs with expiration
-- 🌐 Public buckets (no token required)
-- 🗑️ Full file & bucket deletion
-- 💾 MongoDB backend for metadata
+This is a budget S3 clone. No EC2. No S3. No AWS bill. Just your free Google Drive account, Express, and vibes.
 
 ---
 
-## 📦 Tech Stack
+## 😎 Features
 
-- **Node.js + Express.js**
-- **MongoDB (via Mongoose)**
-- **Google Drive API**
-- **OAuth 2.0** (access & refresh tokens)
-- **Multer** for file upload middleware
-
----
-
-## 🧪 API Endpoints Overview
-
-### 🔐 Auth
-
-| Method | Endpoint         | Description                    |
-|--------|------------------|--------------------------------|
-| GET    | `/oauth/login`   | Redirect to Google login       |
-| GET    | `/oauth/callback`| Handle OAuth callback          |
+- ☕ Login with Google because we’re too lazy to build our own auth
+- 📁 Buckets that are actually Drive folders but we lie to ourselves
+- 🕵️‍♂️ Encrypted filenames so you feel hacker-y
+- 📤 Uploads that work... mostly
+- 🎬 Stream files like it's Netflix (but for PNGs)
+- 🔗 Public URLs with expiration — like Snapchat, but for files
+- 🧹 DELETE endpoints for when you rage quit your project
 
 ---
 
-### 📁 Bucket Management
+## 🔧 Tech (aka things I copied from StackOverflow)
 
-| Method | Endpoint                        | Description                        |
-|--------|----------------------------------|------------------------------------|
-| PUT    | `/:bucketName`                   | Create a new bucket                |
-| PATCH  | `/:bucketName/visibility`        | Make bucket public or private      |
-| GET    | `/:bucketName`                   | List all files in the bucket       |
-| DELETE | `/:bucketName`                   | Delete a bucket and its files      |
-
----
-
-### 📂 File Operations
-
-| Method | Endpoint                            | Description                       |
-|--------|--------------------------------------|-----------------------------------|
-| PUT    | `/:bucketName/:fileName`            | Upload file to bucket             |
-| GET    | `/:bucketName/:fileName`            | Stream/download private file      |
-| DELETE | `/:bucketName/:fileName`            | Delete file from Drive + MongoDB  |
+- Node.js + Express.js
+- Google Drive API (a blessing and a curse)
+- MongoDB for "serious persistence™"
+- Multer — the least painful way to upload files in Express
+- OAuth2 because we love complicated flows for simple problems
 
 ---
 
-### 🌍 Public Access
+## 📡 API Endpoints That Make You Feel Like AWS
 
-| Method | Endpoint                                         | Description                                 |
-|--------|--------------------------------------------------|---------------------------------------------|
-| POST   | `/presign/:bucketName/:fileName`                | Generate a pre-signed public download link  |
-| DELETE | `/presign/:bucketName/:fileName`                | Revoke public token                         |
-| GET    | `/public/:bucketName/:fileName?token=xxx`       | Public access to file (with or without token) |
+### 🔐 Auth Stuff
 
-- Add `?download=true` to force file download
-- If the bucket is public, token is not required
+| Method | Endpoint         | Does What                     |
+|--------|------------------|-------------------------------|
+| GET    | `/oauth/login`   | Yeets you to Google login     |
+| GET    | `/oauth/callback`| Google yeets you back here    |
+
+Returns `{ accessToken: "✨magic✨" }`
 
 ---
 
-## 🛠️ Installation & Setup
+### 📁 Bucketology
 
-### 1. Clone the repo
+| Method | Route                        | Meaning                        |
+|--------|------------------------------|--------------------------------|
+| PUT    | `/:bucketName`               | Creates a fake S3 bucket       |
+| PATCH  | `/:bucketName/visibility`    | Toggles public/private drama   |
+| GET    | `/:bucketName`               | Lists files like a nosy friend |
+| DELETE | `/:bucketName`               | Destroys your dreams and files |
+
+---
+
+### 📂 File Shenanigans
+
+| Method | Route                              | Functionality                  |
+|--------|------------------------------------|--------------------------------|
+| PUT    | `/:bucketName/:fileName`           | Upload file with secret name   |
+| GET    | `/:bucketName/:fileName`           | Streams file like a cool kid   |
+| DELETE | `/:bucketName/:fileName`           | Deletes it like an ex's photo  |
+
+---
+
+### 🌍 Public Internet Chaos
+
+| Method | Route                                          | What it Does                             |
+|--------|------------------------------------------------|------------------------------------------|
+| POST   | `/presign/:bucketName/:fileName`              | Makes your file famous (temporarily)     |
+| DELETE | `/presign/:bucketName/:fileName`              | Takes the fame away                      |
+| GET    | `/public/:bucketName/:fileName`               | Anyone can see it (S3-style 🔓)          |
+
+📝 Add `?token=xyz` for private links  
+📥 Add `?download=true` if you're too good to stream
+
+---
+
+## 🛠 How to Run This Masterpiece
+
+### 1. Clone the repo like a hacker:
 
 ```bash
-git clone https://github.com/rheatkhs/woji-s3.git
+git clone https://github.com/your-name/woji-s3.git
 cd woji-s3
 ```
 
-### 2. Install dependencies
+### 2. Install chaos:
 
 ```bash
 npm install
 ```
 
-### 3. Configure environment variables
-
-Create a `.env` file:
+### 3. Setup your secret `.env`:
 
 ```env
 PORT=8000
-MONGODB_URI=your-mongodb-uri
+MONGODB_URI=mongodb://localhost:27017/woji-s3
 
-GOOGLE_CLIENT_ID=your-google-client-id
-GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_CLIENT_ID=google-scammed-you
+GOOGLE_CLIENT_SECRET=top-secret
 GOOGLE_REDIRECT_URI=http://localhost:8000/oauth/callback
 ```
 
-### 4. Start the development server
+### 4. Start the beast:
 
 ```bash
 npm run dev
 ```
 
-Or to run in production:
+Or if you like living dangerously:
 
 ```bash
 node index.js
@@ -119,124 +119,60 @@ node index.js
 
 ---
 
-## 🧾 Example Workflow
+## 🚀 Quickstart (aka copy/paste until it works)
 
-1. **Login using Google**  
-   Visit: `http://localhost:8000/oauth/login`  
-   You’ll be redirected to Google, and get back an `accessToken`.
-
-2. **Use the access token in requests:**  
-   All private routes require:
-
+1. Open browser → `http://localhost:8000/oauth/login`
+2. Login with Google → get `accessToken`
+3. Make API calls like a pro:
+   ```http
+   Authorization: Bearer your-token
    ```
-   Authorization: Bearer <accessToken>
-   ```
-
-3. **Create a bucket:**
-
-```http
-PUT /my-bucket-name
-```
-
-4. **Upload a file:**
-
-```http
-PUT /my-bucket-name/myfile.png
-Content-Type: multipart/form-data
-Authorization: Bearer <accessToken>
-```
-
-5. **Download the file (private):**
-
-```http
-GET /my-bucket-name/myfile.png
-Authorization: Bearer <accessToken>
-```
-
-6. **Generate public pre-signed link:**
-
-```http
-POST /presign/my-bucket-name/myfile.png
-Authorization: Bearer <accessToken>
-```
-
-Response:
-
-```json
-{
-  "url": "http://localhost:8000/public/my-bucket-name/myfile.png?token=abc123",
-  "expires_at": "2030-01-01T00:00:00Z"
-}
-```
-
-7. **Mark entire bucket as public:**
-
-```http
-PATCH /my-bucket-name/visibility
-Authorization: Bearer <accessToken>
-Content-Type: application/json
-
-{
-  "public": true
-}
-```
-
-8. **Stream or download public file (no auth):**
-
-```http
-GET /public/my-bucket-name/myfile.png
-```
-
-Optionally force download:
-
-```
-GET /public/my-bucket-name/myfile.png?download=true
-```
 
 ---
 
-## 📂 Folder Structure
+## 📂 File Tree (100% hand-crafted)
 
 ```
 .
 ├── routes/
-│   ├── file.js           # All bucket and file operations
-│   └── oauth.js          # Google OAuth 2.0 auth
+│   ├── file.js         // all your bucket dreams
+│   └── oauth.js        // where the Google magic happens
 ├── models/
 │   ├── Bucket.js
 │   ├── File.js
 │   └── User.js
-├── middlewares/
-│   └── auth.js           # Bearer token authentication
 ├── services/
-│   └── drive.js          # Google Drive API uploader
+│   └── drive.js        // how the files get into Drive 🪄
 ├── utils/
-│   ├── filename.js       # Encrypted filename generator
-│   └── googleAuth.js     # Refresh token handler
-├── uploads/              # Temp upload directory
-├── .env
+│   ├── googleAuth.js   // auto-refresh fairy
+│   └── filename.js     // encryption voodoo
+├── middlewares/
+│   └── auth.js         // bearer of tokens
+├── uploads/            // temporary chaos
 ├── index.js
-└── package.json
+└── .env
 ```
 
 ---
 
-## 🧠 Future Ideas
+## 🧠 Future "Definitely Not Promises"
 
-- JWT-based sessions
-- Admin dashboard
-- Soft-deletes & recovery
-- File access analytics
-- Multi-user permissions
+- 🧊 File versioning like Git, but worse
+- 🗑 Trash can for when you accidentally delete `final_final_v2_REAL.png`
+- 🎨 Admin panel for your inner UI designer
+- 🛡 Token expiration timers that actually expire
+- 📊 Analytics for bragging to your team
 
 ---
 
 ## 📄 License
 
-MIT License
+Because someone told me to.
 
 ```
 MIT License
+
+Copyright (c) 2025
 
 Permission is hereby granted, free of charge, to any person obtaining a copy  
 of this software and associated documentation files (the "Software"), to deal  
@@ -256,3 +192,11 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN  
 THE SOFTWARE.
 ```
+
+---
+
+## 🧼 Final Thoughts
+
+If AWS S3 and Google Drive had a child raised by Node.js devs with caffeine addiction, this would be it.
+
+PRs welcome. Bugs expected. Fun guaranteed. 🎉
