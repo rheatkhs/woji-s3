@@ -1,3 +1,4 @@
+const crypto = require("crypto");
 const express = require("express");
 const fs = require("fs");
 const multer = require("multer");
@@ -13,7 +14,7 @@ const router = express.Router();
 const upload = multer({ dest: "uploads/" });
 
 /**
- * Create a new bucket (S3-style: PUT /:bucketName)
+ * Create a new bucket (PUT /:bucketName)
  */
 router.put("/:bucketName", auth, async (req, res) => {
   const { bucketName } = req.params;
@@ -48,7 +49,7 @@ router.put("/:bucketName", auth, async (req, res) => {
 });
 
 /**
- * Upload a file to bucket (S3-style: PUT /:bucketName/:fileName)
+ * Upload a file (PUT /:bucketName/:fileName)
  */
 router.put(
   "/:bucketName/:fileName",
@@ -94,7 +95,7 @@ router.put(
 );
 
 /**
- * Stream/download a file (S3-style: GET /:bucketName/:fileName)
+ * Stream/download file (GET /:bucketName/:fileName)
  */
 router.get("/:bucketName/:fileName", auth, async (req, res) => {
   const { bucketName, fileName } = req.params;
@@ -123,7 +124,7 @@ router.get("/:bucketName/:fileName", auth, async (req, res) => {
     res.setHeader("Content-Type", file.mime_type);
     res.setHeader(
       "Content-Disposition",
-      `inline; filename="${file.original_file_name}"`
+      `inline; filename="${file.original_file_name || file.file_name}"`
     );
     response.data.pipe(res);
   } catch (err) {
@@ -133,7 +134,7 @@ router.get("/:bucketName/:fileName", auth, async (req, res) => {
 });
 
 /**
- * List all files in a bucket (S3-style: GET /:bucketName)
+ * List files in bucket (GET /:bucketName)
  */
 router.get("/:bucketName", auth, async (req, res) => {
   const { bucketName } = req.params;
@@ -143,6 +144,107 @@ router.get("/:bucketName", auth, async (req, res) => {
 
   const files = await File.find({ bucket: bucket._id }).select("-__v -user");
   res.json({ bucket: bucket.name, files });
+});
+
+/**
+ * Generate token (internal use)
+ */
+function generateToken() {
+  return crypto.randomBytes(24).toString("hex");
+}
+
+/**
+ * Generate public pre-signed URL (POST /presign/:bucketName/:fileName)
+ */
+router.post("/presign/:bucketName/:fileName", auth, async (req, res) => {
+  const { bucketName, fileName } = req.params;
+
+  try {
+    const bucket = await Bucket.findOne({
+      name: bucketName,
+      user: req.user._id,
+    });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    const file = await File.findOne({
+      file_name: fileName,
+      user: req.user._id,
+      bucket: bucket._id,
+    });
+
+    if (!file) return res.status(404).json({ error: "File not found" });
+
+    const token = generateToken();
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+
+    file.public_token = token;
+    file.expires_at = expiresAt;
+    await file.save();
+
+    const url = `${req.protocol}://${req.get(
+      "host"
+    )}/public/${bucketName}/${fileName}?token=${token}`;
+    res.json({ url, expires_at: expiresAt.toISOString() });
+  } catch (err) {
+    console.error("Presign error:", err);
+    res.status(500).json({ error: "Failed to generate presigned URL" });
+  }
+});
+
+/**
+ * Access file with public token (GET /public/:bucketName/:fileName?token=xxx)
+ */
+router.get("/public/:bucketName/:fileName", async (req, res) => {
+  const { bucketName, fileName } = req.params;
+  const { token, download } = req.query;
+
+  if (!token) return res.status(401).json({ error: "Missing token" });
+
+  try {
+    const bucket = await Bucket.findOne({ name: bucketName });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    const file = await File.findOne({
+      file_name: fileName,
+      bucket: bucket._id,
+      public_token: token,
+    }).populate("user");
+
+    if (!file) {
+      console.warn("🔒 Public token lookup failed", {
+        bucketName,
+        fileName,
+        token,
+      });
+      return res.status(404).json({ error: "File not found or token invalid" });
+    }
+
+    if (file.expires_at && new Date() > file.expires_at) {
+      return res.status(403).json({ error: "Token expired" });
+    }
+
+    const authClient = new google.auth.OAuth2();
+    authClient.setCredentials({ access_token: file.user.google_access_token });
+    const drive = google.drive({ version: "v3", auth: authClient });
+
+    const response = await drive.files.get(
+      { fileId: file.drive_file_id, alt: "media" },
+      { responseType: "stream" }
+    );
+
+    res.setHeader("Content-Type", file.mime_type);
+    res.setHeader(
+      "Content-Disposition",
+      download === "true"
+        ? `attachment; filename="${file.original_file_name}"`
+        : `inline; filename="${file.original_file_name}"`
+    );
+
+    response.data.pipe(res);
+  } catch (err) {
+    console.error("Public download failed:", err.message);
+    res.status(500).json({ error: "Streaming failed" });
+  }
 });
 
 module.exports = router;
