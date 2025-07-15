@@ -4,6 +4,7 @@ const bucketSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   name: { type: String, required: true },
   drive_folder_id: { type: String, required: true },
+  public: { type: Boolean, default: false },
   created_at: { type: Date, default: Date.now },
 });
 

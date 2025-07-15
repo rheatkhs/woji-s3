@@ -3,6 +3,7 @@ const express = require("express");
 const fs = require("fs");
 const multer = require("multer");
 const { google } = require("googleapis");
+const { getGoogleAuth } = require("../utils/googleAuth");
 
 const Bucket = require("../models/Bucket");
 const File = require("../models/File");
@@ -22,8 +23,7 @@ router.put("/:bucketName", auth, async (req, res) => {
   const exists = await Bucket.findOne({ name: bucketName, user: req.user._id });
   if (exists) return res.status(400).json({ error: "Bucket already exists" });
 
-  const authClient = new google.auth.OAuth2();
-  authClient.setCredentials({ access_token: req.user.google_access_token });
+  const authClient = await getGoogleAuth(file.user || req.user);
   const drive = google.drive({ version: "v3", auth: authClient });
 
   try {
@@ -62,8 +62,7 @@ router.delete("/:bucketName", auth, async (req, res) => {
     });
     if (!bucket) return res.status(404).json({ error: "Bucket not found" });
 
-    const authClient = new google.auth.OAuth2();
-    authClient.setCredentials({ access_token: req.user.google_access_token });
+    const authClient = await getGoogleAuth(file.user || req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 
     // Step 2: Find all files in the bucket
@@ -100,6 +99,34 @@ router.delete("/:bucketName", auth, async (req, res) => {
   } catch (err) {
     console.error("Bucket delete error:", err.message);
     res.status(500).json({ error: "Failed to delete bucket" });
+  }
+});
+
+/**
+ * Change visibility of a bucket (PATCH /:bucketName/visibility)
+ */
+router.patch("/:bucketName/visibility", auth, async (req, res) => {
+  const { bucketName } = req.params;
+  const { public: isPublic } = req.body;
+
+  try {
+    const bucket = await Bucket.findOne({
+      name: bucketName,
+      user: req.user._id,
+    });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    bucket.public = !!isPublic;
+    await bucket.save();
+
+    res.json({
+      message: `Bucket visibility set to ${
+        bucket.public ? "public" : "private"
+      }`,
+    });
+  } catch (err) {
+    console.error("Update bucket visibility failed:", err);
+    res.status(500).json({ error: "Failed to update visibility" });
   }
 });
 
@@ -166,8 +193,7 @@ router.get("/:bucketName/:fileName", auth, async (req, res) => {
 
   if (!file) return res.status(404).json({ error: "File not found in bucket" });
 
-  const authClient = new google.auth.OAuth2();
-  authClient.setCredentials({ access_token: req.user.google_access_token });
+  const authClient = await getGoogleAuth(file.user || req.user);
   const drive = google.drive({ version: "v3", auth: authClient });
 
   try {
@@ -211,8 +237,7 @@ router.delete("/:bucketName/:fileName", auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: "File not found" });
 
     // Delete file from Google Drive
-    const authClient = new google.auth.OAuth2();
-    authClient.setCredentials({ access_token: req.user.google_access_token });
+    const authClient = await getGoogleAuth(file.user || req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 
     await drive.files.delete({
@@ -288,13 +313,11 @@ router.post("/presign/:bucketName/:fileName", auth, async (req, res) => {
 });
 
 /**
- * Access file with public token (GET /public/:bucketName/:fileName?token=xxx)
+ * Access file with public token if bucket is public (GET /public/:bucketName/:fileName?token=xxx)
  */
 router.get("/public/:bucketName/:fileName", async (req, res) => {
   const { bucketName, fileName } = req.params;
   const { token, download } = req.query;
-
-  if (!token) return res.status(401).json({ error: "Missing token" });
 
   try {
     const bucket = await Bucket.findOne({ name: bucketName });
@@ -303,24 +326,32 @@ router.get("/public/:bucketName/:fileName", async (req, res) => {
     const file = await File.findOne({
       file_name: fileName,
       bucket: bucket._id,
-      public_token: token,
     }).populate("user");
 
-    if (!file) {
-      console.warn("🔒 Public token lookup failed", {
-        bucketName,
-        fileName,
-        token,
-      });
-      return res.status(404).json({ error: "File not found or token invalid" });
+    if (!file) return res.status(404).json({ error: "File not found" });
+
+    // ✅ Public access allowed if bucket is marked public
+    const isPublic = bucket.public;
+
+    // 🔒 If not public, require valid token
+    if (!isPublic) {
+      if (!token) {
+        return res
+          .status(401)
+          .json({ error: "Missing token for private bucket" });
+      }
+
+      if (file.public_token !== token) {
+        return res.status(403).json({ error: "Invalid token" });
+      }
+
+      if (file.expires_at && new Date() > file.expires_at) {
+        return res.status(403).json({ error: "Token expired" });
+      }
     }
 
-    if (file.expires_at && new Date() > file.expires_at) {
-      return res.status(403).json({ error: "Token expired" });
-    }
-
-    const authClient = new google.auth.OAuth2();
-    authClient.setCredentials({ access_token: file.user.google_access_token });
+    // ✅ Auth client setup
+    const authClient = await getGoogleAuth(file.user || req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 
     const response = await drive.files.get(
