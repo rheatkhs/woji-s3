@@ -134,6 +134,47 @@ router.get("/:bucketName/:fileName", auth, async (req, res) => {
 });
 
 /**
+ * Delete files in bucket (DELETE /:bucketName/:fileName)
+ */
+router.delete("/:bucketName/:fileName", auth, async (req, res) => {
+  const { bucketName, fileName } = req.params;
+
+  try {
+    // Find the bucket
+    const bucket = await Bucket.findOne({
+      name: bucketName,
+      user: req.user._id,
+    });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    // Find the file in the bucket
+    const file = await File.findOne({
+      file_name: fileName,
+      user: req.user._id,
+      bucket: bucket._id,
+    });
+    if (!file) return res.status(404).json({ error: "File not found" });
+
+    // Delete file from Google Drive
+    const authClient = new google.auth.OAuth2();
+    authClient.setCredentials({ access_token: req.user.google_access_token });
+    const drive = google.drive({ version: "v3", auth: authClient });
+
+    await drive.files.delete({
+      fileId: file.drive_file_id,
+    });
+
+    // Remove file from MongoDB
+    await file.deleteOne();
+
+    res.json({ message: "File deleted successfully" });
+  } catch (err) {
+    console.error("Delete file error:", err.message);
+    res.status(500).json({ error: "Failed to delete file" });
+  }
+});
+
+/**
  * List files in bucket (GET /:bucketName)
  */
 router.get("/:bucketName", auth, async (req, res) => {
