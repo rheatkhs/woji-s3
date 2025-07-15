@@ -49,6 +49,61 @@ router.put("/:bucketName", auth, async (req, res) => {
 });
 
 /**
+ * Delete a bucket (DELETE /:bucketName)
+ */
+router.delete("/:bucketName", auth, async (req, res) => {
+  const { bucketName } = req.params;
+
+  try {
+    // Step 1: Find the bucket
+    const bucket = await Bucket.findOne({
+      name: bucketName,
+      user: req.user._id,
+    });
+    if (!bucket) return res.status(404).json({ error: "Bucket not found" });
+
+    const authClient = new google.auth.OAuth2();
+    authClient.setCredentials({ access_token: req.user.google_access_token });
+    const drive = google.drive({ version: "v3", auth: authClient });
+
+    // Step 2: Find all files in the bucket
+    const files = await File.find({ bucket: bucket._id });
+
+    // Step 3: Delete each file from Google Drive
+    for (const file of files) {
+      try {
+        await drive.files.delete({ fileId: file.drive_file_id });
+      } catch (err) {
+        console.warn(
+          `Failed to delete file ${file.file_name} from Drive:`,
+          err.message
+        );
+      }
+    }
+
+    // Step 4: Delete the folder itself
+    try {
+      await drive.files.delete({ fileId: bucket.drive_folder_id });
+    } catch (err) {
+      console.warn(`Failed to delete bucket folder from Drive:`, err.message);
+    }
+
+    // Step 5: Remove all file documents
+    await File.deleteMany({ bucket: bucket._id });
+
+    // Step 6: Remove the bucket document
+    await bucket.deleteOne();
+
+    res.json({
+      message: `Bucket '${bucketName}' and all its files have been deleted.`,
+    });
+  } catch (err) {
+    console.error("Bucket delete error:", err.message);
+    res.status(500).json({ error: "Failed to delete bucket" });
+  }
+});
+
+/**
  * Upload a file (PUT /:bucketName/:fileName)
  */
 router.put(
