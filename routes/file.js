@@ -175,7 +175,7 @@ router.post("/presign/:bucketName/:fileName", auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: "File not found" });
 
     const token = generateToken();
-    const expiresAt = new Date(Date.now() + 1000 * 60 * 60); // 1 hour
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 365 * 5); // 5 years
 
     file.public_token = token;
     file.expires_at = expiresAt;
