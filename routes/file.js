@@ -23,7 +23,7 @@ router.put("/:bucketName", auth, async (req, res) => {
   const exists = await Bucket.findOne({ name: bucketName, user: req.user._id });
   if (exists) return res.status(400).json({ error: "Bucket already exists" });
 
-  const authClient = await getGoogleAuth(file.user || req.user);
+  const authClient = await getGoogleAuth(req.user);
   const drive = google.drive({ version: "v3", auth: authClient });
 
   try {
@@ -62,7 +62,7 @@ router.delete("/:bucketName", auth, async (req, res) => {
     });
     if (!bucket) return res.status(404).json({ error: "Bucket not found" });
 
-    const authClient = await getGoogleAuth(file.user || req.user);
+    const authClient = await getGoogleAuth(req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 
     // Step 2: Find all files in the bucket
@@ -193,7 +193,7 @@ router.get("/:bucketName/:fileName", auth, async (req, res) => {
 
   if (!file) return res.status(404).json({ error: "File not found in bucket" });
 
-  const authClient = await getGoogleAuth(file.user || req.user);
+  const authClient = await getGoogleAuth(req.user);
   const drive = google.drive({ version: "v3", auth: authClient });
 
   try {
@@ -237,7 +237,7 @@ router.delete("/:bucketName/:fileName", auth, async (req, res) => {
     if (!file) return res.status(404).json({ error: "File not found" });
 
     // Delete file from Google Drive
-    const authClient = await getGoogleAuth(file.user || req.user);
+    const authClient = await getGoogleAuth(req.user);
     const drive = google.drive({ version: "v3", auth: authClient });
 
     await drive.files.delete({
